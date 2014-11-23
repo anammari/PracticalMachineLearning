@@ -1,0 +1,174 @@
+---
+title: "Predicting How Well Health Participants Perform Weight Lifting Exercises"
+date: "17/11/2014"
+output:
+  html_document:
+    theme: cerulean
+---
+
+<!-- For more info on RMarkdown see http://rmarkdown.rstudio.com/ -->
+
+<!-- Enter the code required to load your data in the space below. The data will be loaded but the line of code won't show up in your write up (echo=FALSE) in order to save space-->
+```{r echo=FALSE}
+library(caret)
+library(randomForest)
+setwd("C:\\Users\\Ahmad\\Dropbox\\PD\\Practical Machine Learning - Coursera\\Project")
+mydata <- read.csv(file="pml-training.csv", header=TRUE)
+mydatatest <- read.csv(file="pml-testing.csv", header=TRUE)
+```
+
+<!-- In the remainder of the document, add R code chunks as needed -->
+
+### Introduction:
+
+In this report, I will try to build a machine learning model to predict how well health participants perform weight lifting exercises based on a publicly available Weight Lifting Exercises Dataset. In particular, I will describe:
+
+- How I built my model, including how I selected the important attributes for prediction. 
+
+- How I used Cross Validation.
+
+- How I evaluated my model based on a testing sample of the data. 
+
+
+### Data:
+
+Six male participants aged between 20-28 years were asked to perform one set of 10 repetitions of the Unilateral Dumbbell Biceps Curl in five different fashions: 
+
+- exactly according to the specification (Class A)
+
+- throwing the elbows to the front (Class B)
+
+- lifting the dumbbell only halfway (Class C)
+
+- lowering the dumbbell only halfway (Class D)  
+
+- throwing the hips to the front (Class E)
+
+
+#### Citation:
+
+The Weight Lifting Exercises Dataset is available from the following source:
+
+**Velloso, E.; Bulling, A.; Gellersen, H.; Ugulino, W.; Fuks, H. Qualitative Activity Recognition of Weight Lifting Exercises. Proceedings of 4th International Conference in Cooperation with SIGCHI (Augmented Human '13) . Stuttgart, Germany: ACM SIGCHI, 2013.**
+
+URL: **http://groupware.les.inf.puc-rio.br/har#ixzz3JtVWwoJt**
+
+
+#### Cases:
+
+ 
+```{r}
+cases <- dim(mydata)[1]
+vars <- dim(mydata)[2]
+```
+
+There are `r cases` cases representing the exercise events of the participants. 
+
+#### Variables: 
+
+There are `r vars` variables in the dataset. 
+
+##### Predictors
+
+```{r comment=NA}
+options(width = 300)
+names(mydata[-c(1,2,160)])
+```
+
+##### Target attribute
+```{r comment=NA}
+levels(mydata$classe)
+```
+
+### Predictive Modelling
+
+I will use the **Random Forest** Classification Algorithm described in **http://www.stat.berkeley.edu/~breiman/RandomForests/cc_home.htm#ooberr** to build a Predictive Model based on the exercise events data to predict the **classe** variable. The reason I chose Random Forest is because:
+
+- It is unexcelled in accuracy among current algorithms.
+
+- It can handle thousands of input variables without variable deletion, which is suitable for our case since we have plenty of input variables. 
+
+- It gives estimates of what variables are important in the classification.
+
+- It generates an internal unbiased estimate of the generalization error as the forest building progresses.
+
+- Random forests does not overfit, without the need for explicit cross-validation or a separate test set to get an unbiased estimate of the test set error. It is estimated internally, during the run. 
+
+#### Creating Training / Testing Samples
+
+I will have 70% of the original dataset for training the model and use the remaining 30% of the data for evaluating the model. 
+
+```{r}
+mydata[,c(3:159)] <- sapply(mydata[,c(3:159)],as.numeric)
+set.seed(33833)
+inTrain <- createDataPartition(y=mydata$classe, p=0.70, list=FALSE)
+training <- mydata[inTrain,]
+testing <- mydata[-inTrain,]
+tr <- dim(training)[1]
+ts <- dim(testing)[1]
+```
+
+- Training sample contains `r tr` cases.
+- Testing sample contains `r ts` cases.
+
+#### Variable Importance
+
+Here I will calculate the variable importance. First, I will run random forests with all the variables. Second, I will use the varImp function in the caret package to depict the most important variables that Random Forests used to build the model, based on the Gini Importance. 
+
+```{r}
+modFit <- train(classe ~ .,data=training[c(3:160)],method="rf",prox=TRUE)
+```
+
+##### Gini importance
+
+```{r comment=NA}
+varImp(modFit, type=2)
+```
+
+
+#### Fitting the Model for Prediction 
+
+In the next run of Random Forests, I will include only the variables that have no missing values in the accompanying test set having 20 cases. These variables will be the predictors to build my Random Forests model.   
+
+```{r}
+mydatatestnomissing <- mydatatest[,colSums(is.na(mydatatest)) != nrow(mydatatest)]
+cols <- names(mydatatestnomissing[-c(1,2,60)])
+cols[length(cols)+1] <- "classe"
+trainingsubset <- training[,cols]
+modFit2 <- randomForest(classe ~ ., data=trainingsubset, importance=TRUE, proximity=TRUE)
+```
+
+Below is a figure that depicts the attribute importance of the final model:
+```{r out.width = '800px', out.height = '800px'}
+varImpPlot(modFit2, main="Attribute Importance", cex=.75)
+```
+
+
+#### In-Sample and Out-of-Sample Evaluation
+
+##### In-Sample Confusion Matrix
+
+```{r comment=NA}
+modFit2$confusion
+```
+
+As can be seen above, the In-Sample class error is very small, showing very good prediction power.  
+
+##### Out-of-Sample Confusion Matrix
+
+Here I apply the model on the testing sample and depict the confusion matrix to determine whether my model can generalize to out of sample cases: 
+
+```{r comment=NA}
+testingsubset <- testing[,cols]
+pred <- predict(modFit2,testingsubset)
+confusionMatrix(pred,testingsubset$classe)
+
+```
+
+
+### Conclusion:
+
+As can be seen by the evaluation details based on the out-of-sample cases, the prediction accuracy is very high on all the five classes of the outcome variable. This means the model can generalize to out of sample cases.
+
+       
+

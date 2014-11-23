@@ -1,0 +1,22 @@
+Generating Data for the Prediction Assignment:
+
+mydatatest[,c(3:159)] <- sapply(mydatatest[,c(3:159)],as.numeric)
+mydatatestnomissing <- mydatatest[,colSums(is.na(mydatatest)) != nrow(mydatatest)]
+cols <- names(mydatatestnomissing[-c(1,2,60)])
+testingassignment <- mydatatestnomissing[,cols]
+predAssignment <- predict(modFit2,testingassignment)
+answers <- as.character(predAssignment)
+
+pml_write_files = function(x){
+  n = length(x)
+  for(i in 1:n){
+    filename = paste0("problem_id_",i,".txt")
+    write.table(x[i],file=filename,quote=FALSE,row.names=FALSE,col.names=FALSE)
+  }
+}
+
+setwd("C:\\Users\\Ahmad\\Dropbox\\PD\\Practical Machine Learning - Coursera\\Project\\predictions")
+pml_write_files(answers)
+
+
+
